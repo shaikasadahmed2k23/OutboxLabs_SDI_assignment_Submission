@@ -1,0 +1,101 @@
+// ─────────────────────────────────────────────────────────────
+// Prisma schema — Postgres (Supabase)
+//
+// DESIGN DECISION: EmailJob.status in Postgres is the SINGLE
+// SOURCE OF TRUTH for "has this email been sent". BullMQ's own
+// job state is treated as a delivery mechanism only, never as
+// the authority. Every worker run re-checks this row before
+// sending. This is what makes restarts + retries idempotent:
+// even if BullMQ somehow re-delivers a job, the worker sees
+// status = SENT and short-circuits instead of double-sending.
+// ─────────────────────────────────────────────────────────────
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")   // pooled connection (app runtime, PgBouncer transaction mode)
+  directUrl = env("DIRECT_URL")     // direct connection (migrations only — PgBouncer can't run DDL)
+}
+
+enum EmailStatus {
+  PENDING     // row created, BullMQ delayed job scheduled
+  QUEUED      // picked up by worker, about to attempt send
+  SENT        // delivered successfully via SMTP
+  FAILED      // permanently failed (exhausted retries)
+  RATE_LIMITED // hit hourly cap, rescheduled into next window
+}
+
+model Sender {
+  id        String   @id @default(uuid())
+  name      String
+  fromEmail String   @unique
+  // per-sender hourly cap; falls back to global env default if null
+  maxPerHour Int?
+  createdAt DateTime @default(now())
+
+  emailJobs EmailJob[]
+  slackIntegration SlackIntegration?
+}
+
+model EmailJob {
+  id            String      @id @default(uuid())
+  senderId      String
+  sender        Sender      @relation(fields: [senderId], references: [id])
+
+  toEmail       String
+  subject       String
+  body          String      @db.Text
+
+  scheduledFor  DateTime    // when the user wants it sent
+  status        EmailStatus @default(PENDING)
+
+  // BullMQ bookkeeping — jobId here always equals this row's id.
+  // That single fact is the idempotency guarantee: BullMQ enforces
+  // unique jobIds per queue, so a duplicate schedule request or a
+  // crash-recovery re-add can never create two jobs for one row.
+  bullJobId     String?     @unique
+
+  attempts      Int         @default(0)
+  lastError     String?     @db.Text
+
+  sentAt        DateTime?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  // groups rows scheduled from the same CSV/compose submission,
+  // so the dashboard can show them as one batch if needed
+  batchId       String?
+
+  @@index([status])
+  @@index([scheduledFor])
+  @@index([senderId, status])
+}
+
+// One row per sender/tenant that has connected Slack.
+// If no row exists for a sender, rate-limit hits simply don't
+// notify (no crash) — see worker notifySlack() logic.
+model SlackIntegration {
+  id            String   @id @default(uuid())
+  senderId      String   @unique
+  sender        Sender   @relation(fields: [senderId], references: [id])
+
+  accessToken   String   // OAuth token (or incoming webhook URL)
+  teamName      String?
+  channelId     String?
+  connectedAt   DateTime @default(now())
+}
+
+// Redis handles the live hourly counters (fast, TTL'd).
+// This table is a durable audit trail of rate-limit hits,
+// useful for the dashboard / demo video ("show behavior under load").
+model RateLimitEvent {
+  id          String   @id @default(uuid())
+  senderId    String
+  hourWindow  String   // e.g. "2026-09-18T14" — matches Redis key
+  emailsInWindow Int
+  cap         Int
+  createdAt   DateTime @default(now())
+}
