@@ -2,6 +2,7 @@ import { Router } from "express";
 import { prisma } from "../lib/prisma";
 import { scheduleEmailJob } from "../queue/emailQueue";
 import { scheduleRequestSchema } from "../types/schedule";
+import { indexEmailJob, searchEmailJobs } from "../lib/elasticsearch";
 import { randomUUID } from "crypto";
 
 export const scheduleRouter = Router();
@@ -61,6 +62,18 @@ scheduleRouter.post("/schedule", async (req, res) => {
     // Store the BullMQ jobId (== row.id) back for clarity/debugging
     await prisma.emailJob.update({ where: { id: row.id }, data: { bullJobId: row.id } });
 
+    await indexEmailJob({
+      id: row.id,
+      toEmail: row.toEmail,
+      subject: row.subject,
+      body: row.body,
+      status: row.status,
+      senderId: row.senderId,
+      senderName: sender.name,
+      scheduledFor: row.scheduledFor,
+      batchId: row.batchId,
+    });
+
     created.push(row.id);
   }
 
@@ -75,6 +88,21 @@ scheduleRouter.get("/scheduled", async (_req, res) => {
     orderBy: { scheduledFor: "asc" },
   });
   res.json(rows);
+});
+
+/** GET /search?q=... — full-text search across scheduled + sent emails via Elasticsearch */
+scheduleRouter.get("/search", async (req, res) => {
+  const q = (req.query.q as string) || "";
+  if (!q.trim()) {
+    return res.status(400).json({ error: "q query param is required" });
+  }
+  try {
+    const results = await searchEmailJobs(q);
+    res.json(results);
+  } catch (err) {
+    console.error("[search] elasticsearch query failed", err);
+    res.status(503).json({ error: "Search is temporarily unavailable" });
+  }
 });
 
 /** GET /sent — sent + failed rows, for the dashboard's "Sent" tab */

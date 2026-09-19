@@ -64,8 +64,40 @@ notifications immediately, no redeploy. No integration row = silent
 no-op, never a crash.
 
 ### Still open for later phases
-- Elasticsearch indexing (Phase 3)
-- Slack OAuth *authorize flow* itself — token storage exists, the
-  `/auth/slack/*` routes and dashboard "Connect Slack" button don't yet
 - Google OAuth login (Phase 4, frontend)
-- Live BullMQ dashboard UI (Bull Board or similar)
+- Frontend dashboard itself (Phase 4)
+
+## Phase 2 — Slack OAuth, live BullMQ dashboard, Elasticsearch (done)
+
+### Slack OAuth flow
+Real `oauth.v2.access` exchange (`/auth/slack/authorize` → Slack consent
+screen → `/auth/slack/callback`). Used `incoming-webhook` scope rather than
+a bot token + `chat:write` — simpler for this scope of assignment (one
+webhook URL per workspace/channel, no bot token lifecycle to manage) and
+still satisfies "real OAuth flow, live verifiable Slack message." The
+`state` param carries the `senderId` through the redirect round-trip
+(also doubles as Slack's documented CSRF protection). Disconnect (`DELETE
+/auth/slack/:senderId`) just removes the `SlackIntegration` row — the
+worker already re-queries per rate-limit hit with no caching, so
+connect/disconnect take effect immediately, no redeploy, matching the
+spec's explicit requirement.
+
+### Live BullMQ dashboard
+`@bull-board/express` mounted at `/admin/queues`, pointed at the same
+`emailQueue` instance the API and worker both use — satisfies "expose a
+live BullMQ dashboard for real-time queue visibility" directly, no custom
+UI needed for this part.
+
+### Elasticsearch indexing
+Postgres remains the single source of truth (per Phase 1's core decision)
+— ES is a best-effort search index only. Documents are upserted (doc id =
+`EmailJob.id`) on creation and on every status transition (SENT, FAILED).
+A failed ES write is logged and swallowed, never allowed to fail the
+underlying schedule/send operation — a stale search index is an
+acceptable trade-off, a scheduler that can't schedule because ES is down
+is not. `GET /api/search?q=` does a `multi_match` across `toEmail`,
+`subject`, `body`.
+
+### Still open for later phases
+- Google OAuth login (Phase 4, frontend)
+- Frontend dashboard itself (Phase 4)

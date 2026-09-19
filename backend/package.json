@@ -16,6 +16,9 @@
     "prisma:studio": "prisma studio"
   },
   "dependencies": {
+    "@bull-board/api": "^9.10.1",
+    "@bull-board/express": "^9.10.1",
+    "@elastic/elasticsearch": "^9.5.1",
     "@prisma/client": "^5.20.0",
     "bullmq": "^5.13.2",
     "cors": "^2.8.5",

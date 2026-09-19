@@ -9,6 +9,7 @@ import {
   msUntilNextHourWindow,
 } from "./lib/rateLimiter";
 import { notifySlackRateLimitHit } from "./lib/slack";
+import { indexEmailJob } from "./lib/elasticsearch";
 import { QUEUE_NAME, EmailJobData, scheduleEmailJob } from "./queue/emailQueue";
 
 const MIN_DELAY_BETWEEN_SENDS_MS = Number(process.env.MIN_DELAY_BETWEEN_SENDS_MS) || 2000;
@@ -121,6 +122,19 @@ async function processEmailJob(job: Job<EmailJobData>) {
       },
     });
 
+    await indexEmailJob({
+      id: row.id,
+      toEmail: row.toEmail,
+      subject: row.subject,
+      body: row.body,
+      status: "SENT",
+      senderId: row.senderId,
+      senderName: row.sender.name,
+      scheduledFor: row.scheduledFor,
+      sentAt: new Date(),
+      batchId: row.batchId,
+    });
+
     console.log(`[worker] SENT ${emailJobId} → ${row.toEmail} (${messageId}) preview: ${previewUrl}`);
   } catch (err: any) {
     await prisma.emailJob.update({
@@ -131,6 +145,19 @@ async function processEmailJob(job: Job<EmailJobData>) {
         lastError: String(err?.message ?? err),
       },
     });
+
+    await indexEmailJob({
+      id: row.id,
+      toEmail: row.toEmail,
+      subject: row.subject,
+      body: row.body,
+      status: "FAILED",
+      senderId: row.senderId,
+      senderName: row.sender.name,
+      scheduledFor: row.scheduledFor,
+      batchId: row.batchId,
+    });
+
     // Re-throw so BullMQ applies its own retry/backoff on top.
     throw err;
   }
