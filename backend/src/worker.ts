@@ -122,7 +122,7 @@ async function processEmailJob(job: Job<EmailJobData>) {
       },
     });
 
-    await indexEmailJob({
+     indexEmailJob({
       id: row.id,
       toEmail: row.toEmail,
       subject: row.subject,
@@ -146,7 +146,7 @@ async function processEmailJob(job: Job<EmailJobData>) {
       },
     });
 
-    await indexEmailJob({
+     indexEmailJob({
       id: row.id,
       toEmail: row.toEmail,
       subject: row.subject,

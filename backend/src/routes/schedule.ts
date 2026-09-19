@@ -62,7 +62,7 @@ scheduleRouter.post("/schedule", async (req, res) => {
     // Store the BullMQ jobId (== row.id) back for clarity/debugging
     await prisma.emailJob.update({ where: { id: row.id }, data: { bullJobId: row.id } });
 
-    await indexEmailJob({
+     indexEmailJob({
       id: row.id,
       toEmail: row.toEmail,
       subject: row.subject,

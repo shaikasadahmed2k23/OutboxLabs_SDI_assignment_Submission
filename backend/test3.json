@@ -1,0 +1,1 @@
+{"senderId":"0e682693-8106-4ec9-a2b0-a837c80b6cd7","recipients":["r1@test.com","r2@test.com","r3@test.com","r4@test.com","r5@test.com","r6@test.com","r7@test.com","r8@test.com","r9@test.com","r10@test.com","r11@test.com","r12@test.com"],"subject":"Rate Limit Test","body":"Testing rate limiting","startTime":"2026-09-19T16:15:00.000Z","delayBetweenEmailsMs":1000}
