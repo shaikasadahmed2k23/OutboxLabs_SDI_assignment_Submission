@@ -1,0 +1,1 @@
+{"senderId":"64bdf343-4202-4216-8014-3c6d3e6cd32a","recipients":["upstash-test@test.com"],"subject":"Upstash Test","body":"Testing new redis","startTime":"2026-09-20T06:00:00.000Z","delayBetweenEmailsMs":2000}
