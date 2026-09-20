@@ -122,7 +122,8 @@ async function processEmailJob(job: Job<EmailJobData>) {
       },
     });
 
-     indexEmailJob({
+    // Fire-and-forget — see schedule.ts for reasoning
+    indexEmailJob({
       id: row.id,
       toEmail: row.toEmail,
       subject: row.subject,
@@ -146,7 +147,8 @@ async function processEmailJob(job: Job<EmailJobData>) {
       },
     });
 
-     indexEmailJob({
+    // Fire-and-forget — see schedule.ts for reasoning
+    indexEmailJob({
       id: row.id,
       toEmail: row.toEmail,
       subject: row.subject,

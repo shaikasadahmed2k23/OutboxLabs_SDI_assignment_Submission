@@ -14,6 +14,7 @@ export const esClient = new Client({
   requestTimeout: 3000, // fail fast — indexing is best-effort, never worth blocking the API on
   maxRetries: 0,
 });
+
 export const EMAIL_INDEX = "email_jobs";
 
 export async function ensureEmailIndex() {

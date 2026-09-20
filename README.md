@@ -4,10 +4,11 @@ Full-stack email scheduler: BullMQ + Redis for delayed/persistent jobs,
 Postgres (Supabase) for state, Ethereal for SMTP. See `DECISIONS.md`
 for the full architecture reasoning as it's built.
 
-**Status: Phase 1 + Phase 2 complete** — core scheduler, idempotency,
+**Status: Phase 1 + Phase 2 + Phase 4 complete** — core scheduler, idempotency,
 restart recovery, rate limiting, concurrency/throttling, Slack OAuth
-notifications, live BullMQ dashboard, Elasticsearch search indexing.
-Phase 4 (frontend) still to come.
+notifications, live BullMQ dashboard, Elasticsearch search indexing, and a
+Next.js dashboard with real Google login. Phase 3/5 wrap-up (README polish,
+demo video) in progress.
 
 ## Setup
 
@@ -85,3 +86,36 @@ next hour window automatically.
 - **BullMQ dashboard**: open `http://localhost:4000/admin/queues` — you should see the `email-send` queue with your scheduled/delayed jobs listed live
 - **Slack**: `GET http://localhost:4000/auth/slack/authorize?senderId=<id>` in a browser → approve → check `GET http://localhost:4000/auth/slack/status/<id>` shows `connected: true` → schedule enough emails to exceed the seeded sender's 10/hr cap and confirm a message lands in your Slack channel
 - **Elasticsearch search**: `curl "http://localhost:4000/api/search?q=test"` after scheduling a few emails — should return matching rows
+
+## Frontend setup
+
+### 1. Google OAuth
+1. [Google Cloud Console](https://console.cloud.google.com) → new project → **OAuth consent screen** (External, add your own Google account as a test user)
+2. **Credentials → Create Credentials → OAuth client ID → Web application**
+3. Authorized JavaScript origin: `http://localhost:3000`
+4. Authorized redirect URI: `http://localhost:3000/api/auth/callback/google`
+5. Copy the Client ID + Client Secret
+
+### 2. Install & configure
+```bash
+cd frontend
+cp .env.local.example .env.local
+npm install
+```
+Fill in `.env.local`:
+- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — from step 1
+- `NEXTAUTH_SECRET` — any long random string (`openssl rand -base64 32`)
+- `NEXT_PUBLIC_DEFAULT_SENDER_ID` — the seeded `Sender.id` from the backend setup (`npx prisma db seed` printed it, or check `npx prisma studio`)
+
+### 3. Run
+```bash
+npm run dev
+```
+Open [http://localhost:3000](http://localhost:3000) — redirects to `/login`. Sign in with the Google account you added as a test user.
+
+### 4. What you'll see
+- **Dashboard** (`/dashboard`): header with your Google name/email/avatar, Scheduled/Sent tabs, "+ Compose New Email"
+- **Compose modal**: subject, body, CSV/text upload (shows detected email count), start time, delay between emails, hourly limit (informational — the enforced cap is the seeded `Sender.maxPerHour`)
+- **Settings** (`/settings`): Slack connect/disconnect, link to the live BullMQ dashboard (`/admin/queues`)
+
+The frontend polls `/api/scheduled` and `/api/sent` every 8s, so scheduling an email and watching it move from Scheduled → Sent (or get rate-limited) is visible without a manual refresh — useful for the demo video.

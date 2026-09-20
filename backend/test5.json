@@ -1,0 +1,1 @@
+{"senderId":"0e682693-8106-4ec9-a2b0-a837c80b6cd7","recipients":["slacktest1@test.com","slacktest2@test.com"],"subject":"Slack Notify Test","body":"Testing Slack notification","startTime":"2026-09-19T17:55:00.000Z","delayBetweenEmailsMs":1000}

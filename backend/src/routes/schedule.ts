@@ -62,7 +62,12 @@ scheduleRouter.post("/schedule", async (req, res) => {
     // Store the BullMQ jobId (== row.id) back for clarity/debugging
     await prisma.emailJob.update({ where: { id: row.id }, data: { bullJobId: row.id } });
 
-     indexEmailJob({
+    // Fire-and-forget: indexing is best-effort (see elasticsearch.ts), and
+    // awaiting it here would serialize ES latency into every recipient in
+    // the batch — at 1000+ recipients that turns a down/slow ES into a
+    // multi-minute API response. indexEmailJob already catches its own
+    // errors internally, so this is safe to not await.
+    indexEmailJob({
       id: row.id,
       toEmail: row.toEmail,
       subject: row.subject,

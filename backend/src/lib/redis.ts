@@ -14,7 +14,3 @@ export const redisConnection = new IORedis({
   maxRetriesPerRequest: null,
   ...(process.env.REDIS_TLS === "true" ? { tls: {} } : {}),
 });
-
-redisConnection.on("connect", () => console.log("[redis] connected successfully"));
-redisConnection.on("error", (err) => console.error("[redis] connection error:", err.message));
-redisConnection.on("ready", () => console.log("[redis] ready"));
